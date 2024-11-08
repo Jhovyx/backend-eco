@@ -6,7 +6,7 @@ import { QueryCommand, ScanCommand } from '@aws-sdk/client-dynamodb';
 import { v4 as uuid } from 'uuid';
 import * as bcrypt from 'bcrypt';
 import { User } from './entities/user.entity';
-import { GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { UpdatePasswordDTO } from './dto/update-password.dto';
 import { LoginDTO } from './dto/login-users.dto';
 import { ActivitiesService } from 'src/activities/activities.service';
@@ -55,24 +55,33 @@ export class UsersService {
   async findAll() {
     const command = new ScanCommand({
       TableName: 'users',
-      ProjectionExpression: 'primaryKey, firstName, lastName, documentType, documentNumber, phoneNumber, email, profilePictureUrl, userType'
+      ProjectionExpression: '#statusAlias, primaryKey, firstName, lastName, documentType, documentNumber, phoneNumber, email, profilePictureUrl, userType, createdAt, updatedAt',
+      ExpressionAttributeNames: {
+        '#statusAlias': 'status', // Alias para la palabra reservada "status"
+      }
     });
     const result = await this.dynamoService.dynamoCliente.send(command);
-    const users = result.Items.map(item => this.formatUser(item));
+    const users = result.Items.filter(item => item?.status?.BOOL === true).map(item => this.formatUser(item));
     return users
   }
 
   async findOne(id: string) {
     const command = new GetCommand({
       TableName: 'users',
-      ProjectionExpression: 'primaryKey, firstName, lastName, documentType, documentNumber, phoneNumber, email, profilePictureUrl, userType',
+      ProjectionExpression: 'primaryKey, firstName, lastName, documentType, documentNumber, phoneNumber, email, profilePictureUrl, userType, createdAt, updatedAt, #statusAlias',
       Key: {
         primaryKey: id,
+      },
+      ExpressionAttributeNames: {
+        '#statusAlias': 'status', // Alias para la palabra reservada "status"
       },
     });
     const result = await this.dynamoService.dynamoCliente.send(command);
     if(!result.Item)
-      throw new NotFoundException('Usuario no encontrado.')
+      throw new NotFoundException('Usuario no encontrado.');
+    const user = result.Item;
+    if (user?.status?.BOOL === false)
+      throw new NotFoundException('El usuario no está activo.');
     return result.Item
   }
 
@@ -174,7 +183,8 @@ export class UsersService {
       TableName: 'users',
       Item: {
         ...userBD,
-        password: hashedNewPassword
+        password: hashedNewPassword,
+        updatedAt: new Date().getTime()
       }
     });
     await this.dynamoService.dynamoCliente.send(putCommand);
@@ -206,6 +216,38 @@ export class UsersService {
     });
     return await this.findOne(userBDId);
   }
+
+  async deleteUser(id: string, updateUserDto: UpdateUserDto){
+    if(updateUserDto.userAdminId.length !== 0){
+      await this.findOne(id);
+      await this.findOneByIdAdmin(updateUserDto.userAdminId);
+      const command = new GetCommand({
+        TableName: 'users',
+        Key: {
+          primaryKey: id
+        }
+      });
+      const result = await this.dynamoService.dynamoCliente.send(command);
+      const userBD = result.Item;
+      const putCommand = new PutCommand({
+        TableName: 'users',
+        Item: {
+          ...userBD,
+          status: false,
+          updatedAt: new Date().getTime()
+        }
+      });
+      await this.dynamoService.dynamoCliente.send(putCommand);
+      await this.activitiesService.create({
+        userId: updateUserDto.userAdminId,
+        action: 'User deletion',
+        detail: `Usuario con ID ${id} eliminado.`,
+      });
+      return { message: 'Usuario eliminado correctamente.' };
+    }else{
+      throw new NotFoundException('Este usuario no puede realizar esta acción.')
+    }
+  }
   
   //buscar por email
   private async findOneByEmail(email: string) {
@@ -232,10 +274,10 @@ export class UsersService {
     });
     const result = await this.dynamoService.dynamoCliente.send(command);
     if (!result.Item) 
-        throw new NotFoundException('El usuario que desea crear administradores no fue encontrado.');
+        throw new NotFoundException('El usuario administrador no fue encontrado.');
     const userType = result.Item.userType.S;
     if (userType === "cliente")
-        throw new NotFoundException('Este usuario no está permitido que cree administradores.');
+        throw new NotFoundException('Este usuario no está permitido que realize esta acción.');
     return;
   }
 
@@ -250,7 +292,9 @@ export class UsersService {
           phoneNumber: item.phoneNumber.S,
           email: item.email.S,
           profilePictureUrl: item.profilePictureUrl?.S || null,
-          userType: item.userType.S
+          userType: item.userType.S,
+          createdAt: item.createdAt.N,
+          updatedAt: item.updatedAt?.N || null
       };
   }
 

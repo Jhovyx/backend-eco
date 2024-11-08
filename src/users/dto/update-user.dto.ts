@@ -1,4 +1,4 @@
-import { IsEmail, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from "class-validator";
+import { IsEmail, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength, IsUUID } from "class-validator";
 
 export class UpdateUserDto {
 
@@ -18,7 +18,7 @@ export class UpdateUserDto {
     @IsString()
     @MinLength(3)
     @MaxLength(7)
-    @IsIn(['DNI', 'RUC', 'PASSPORT'])
+    @IsIn(['DNI', 'RUC', 'PASAPORTE'])
     readonly documentType?: string;
 
     @IsOptional()
@@ -44,4 +44,10 @@ export class UpdateUserDto {
     @IsOptional()
     @IsString()
     readonly profilePictureUrl?: string;
+
+    @IsOptional()
+    @IsString()
+    @MinLength(1)
+    @IsUUID()
+    readonly userAdminId?: string;
 }
