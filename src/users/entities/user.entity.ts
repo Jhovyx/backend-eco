@@ -34,7 +34,7 @@ export class User {
     userType: string;  // "cargo" in English
 
     @Field(() => Boolean)
-    status: Boolean;
+    estado: Boolean;
 
     @Field(() => Int)
     createdAt: number;

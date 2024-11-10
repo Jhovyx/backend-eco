@@ -1,4 +1,5 @@
-import { IsEmail, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from "class-validator";
+import { IsEmail, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, Validate } from "class-validator";
+import { IsValidDocumentNumberConstraint } from "../validations/validation-document";
 
 export class CreateUserDto {
     
@@ -22,6 +23,7 @@ export class CreateUserDto {
     @MinLength(5)
     @MaxLength(11)
     @Matches(/^\d{8}$|^\d{11}$|^[A-Z0-9]{6,9}$/)
+    @Validate(IsValidDocumentNumberConstraint)
     readonly documentNumber: string;
     
     @IsString()
