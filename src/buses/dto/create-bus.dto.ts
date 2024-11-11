@@ -4,9 +4,13 @@ export class CreateBusDto {
     
     @IsString()
     @MinLength(1)
-    readonly licensePlate
+    readonly placa: string;
     
     @IsNumber()
     @Min(1)
-    readonly capacity
+    readonly capacidad: number;
+
+    @IsString()
+    @MinLength(1)
+    readonly modelo: string;
 }

@@ -1,23 +1,27 @@
-import { ObjectType, Field, ID, Int } from '@nestjs/graphql';
-import { Asiento } from 'src/asientos/entities/asiento.entity';
+import { ObjectType, Field, Int } from '@nestjs/graphql';
 
 @ObjectType()
 export class Bus {
-  @Field(() => ID)
-  id: string;
+  
+  @Field()
+  primaryKey: string;
 
   @Field()
-  licensePlate: string; //placa
+  placa: string;
 
   @Field()
-  capacity: number; // Capacidad de pasajeros
+  modelo: string;
 
-  @Field()
-  status: boolean;
+  @Field(() => Int)
+  capacidad: number;
+
+  @Field(() => Boolean)
+  estado: Boolean;
 
   @Field(() => Int)
   createdAt: number;
 
   @Field(() => Int, { nullable: true })
   updatedAt?: number;
+
 }
