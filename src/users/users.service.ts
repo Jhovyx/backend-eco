@@ -47,7 +47,7 @@ export class UsersService {
     await this.dynamoService.dynamoCliente.send(command);
     await this.activitiesService.create({
       userId: newUser.primaryKey,
-      activityType: 'Creacion de usuario.',
+      activityType: 'CREACION DE USUARIO',
       detail: userAdminId 
         ? `Usuario administrador creado por ${userAdminId}.` 
         : `Usuario cliente creado.`,
@@ -136,7 +136,7 @@ export class UsersService {
     await this.dynamoService.dynamoCliente.send(updateCommand);
     await this.activitiesService.create({
       userId: id,
-      activityType: 'Actualizacion de usuario.',
+      activityType: 'ACTUALIZACIÓN DE USUARIO',
       detail: `Usuario actualizado correctamente.`,
       ip: '127.0.0.1'
     });
@@ -185,7 +185,7 @@ export class UsersService {
     //Registrar la actividad de cambio de contraseña
     await this.activitiesService.create({
       userId: id,
-      activityType: 'Actualizacion de contraseña usuario.',
+      activityType: 'ACTUALIZACIÓN DE CONTRASEÑA',
       detail: `Contraseña actualizada correctamente.`,
       ip: '127.0.0.1'
     });
@@ -222,7 +222,7 @@ export class UsersService {
     }
     await this.activitiesService.create({
       userId: userBDId,
-      activityType: 'Inicio de sesión.',
+      activityType: 'INICIO DE SESIÓN',
       detail: 'Inicio de sesión exitoso',
       ip: '127.0.0.1'
     });
@@ -249,7 +249,7 @@ export class UsersService {
       await this.dynamoService.dynamoCliente.send(updateCommand);
       await this.activitiesService.create({
         userId: updateUserDto.userAdminId,
-        activityType: 'User deletion',
+        activityType: 'ELIMINACIÓN DE USUARIO',
         detail: `Usuario con ID ${id} eliminado.`,
         ip: '127.0.0.1'
       });
