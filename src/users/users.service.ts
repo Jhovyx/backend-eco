@@ -10,6 +10,7 @@ import { PutCommand, } from '@aws-sdk/lib-dynamodb';
 import { UpdatePasswordDTO } from './dto/update-password.dto';
 import { LoginDTO } from './dto/login-users.dto';
 import { ActivitiesService } from 'src/activities/activities.service';
+import { Request } from 'express';
 @Injectable()
 export class UsersService {
   //create, findAll, findOne, update-user, update-password and login
@@ -19,7 +20,7 @@ export class UsersService {
   ){}
 
   //crear
-  async create(createUserDto: CreateUserDto) {
+  async create(createUserDto: CreateUserDto, request: Request) {
     const userExist = await this.findOneByEmail(createUserDto.email)
     if(userExist && userExist.length > 0)
       throw new NotFoundException('El correo ingresado ya esta registrado.');
@@ -45,12 +46,17 @@ export class UsersService {
       }
     })
     await this.dynamoService.dynamoCliente.send(command);
+    let userIp = Array.isArray(request.headers['x-forwarded-for']) 
+    ? request.headers['x-forwarded-for'][0]  // Si es un arreglo, toma la primera IP
+    : (request.headers['x-forwarded-for'] as string) || request.ip; // Si no, usa la IP del encabezado o la IP directa
+    if (userIp === '::1') userIp = '127.0.0.1'; 
     await this.activitiesService.create({
       userId: newUser.primaryKey,
-      action: 'Creacion de usuario.',
+      activityType: 'CREACIÓN DE USUARIO',
       detail: userAdminId 
         ? `Usuario administrador creado por ${userAdminId}.` 
         : `Usuario cliente creado.`,
+      ip: userIp
     });
     return { message: 'Usuario creado con éxito.' };
   }
@@ -91,7 +97,7 @@ export class UsersService {
   }
 
   //actulizar usuario
-  async update(id: string, updateUserDto: UpdateUserDto) {
+  async update(id: string, updateUserDto: UpdateUserDto, request: Request) {
     // Desestructurar los datos de updateUserDto
       const {documentNumber,documentType,email,firstName,lastName,phoneNumber,profilePictureUrl} = updateUserDto;
       if(!documentNumber && !documentType && !email && !firstName && !lastName && !phoneNumber && !profilePictureUrl)
@@ -133,16 +139,21 @@ export class UsersService {
       },
     }); 
     await this.dynamoService.dynamoCliente.send(updateCommand);
+    let userIp = Array.isArray(request.headers['x-forwarded-for']) 
+    ? request.headers['x-forwarded-for'][0]
+    : (request.headers['x-forwarded-for'] as string) || request.ip;
+    if (userIp === '::1') userIp = '127.0.0.1'; 
     await this.activitiesService.create({
       userId: id,
-      action: 'Actualizacion de usuario.',
+      activityType: 'ACTUALIZACIÓN DE USUARIO',
       detail: `Usuario actualizado correctamente.`,
+      ip: userIp
     });
     return userBD;
   }
 
   //actulizar contraseña
-  async updatePasswordUser(id: string, dto: UpdatePasswordDTO) {
+  async updatePasswordUser(id: string, dto: UpdatePasswordDTO, request: Request) {
     // Verificamos que el usuario exista
     const userDB = await this.findOne(id);
     // Consultamos solo la contraseña para evitar exponer datos innecesarios
@@ -180,17 +191,22 @@ export class UsersService {
     });
     await this.dynamoService.dynamoCliente.send(updateCommand);
 
+    let userIp = Array.isArray(request.headers['x-forwarded-for']) 
+    ? request.headers['x-forwarded-for'][0]
+    : (request.headers['x-forwarded-for'] as string) || request.ip;
+    if (userIp === '::1') userIp = '127.0.0.1'; 
     //Registrar la actividad de cambio de contraseña
     await this.activitiesService.create({
       userId: id,
-      action: 'Actualizacion de contraseña usuario.',
+      activityType: 'ACTUALIZACIÓN DE CONTRASEÑA',
       detail: `Contraseña actualizada correctamente.`,
+      ip: userIp
     });
     return { message: 'Contraseña actualizada correctamente.'};
   }
 
   //loguear
-  async login(loginUserDTO: LoginDTO) {
+  async login(loginUserDTO: LoginDTO, request: Request) {
     const userBDId = await this.findOneByEmail(loginUserDTO.email);
     if (!userBDId) 
       throw new NotFoundException('Usuario no encontrado.');
@@ -217,16 +233,21 @@ export class UsersService {
     if (!passwordMatch) {
       throw new NotFoundException('Contraseña incorrecta.');
     }
+    let userIp = Array.isArray(request.headers['x-forwarded-for']) 
+    ? request.headers['x-forwarded-for'][0]
+    : (request.headers['x-forwarded-for'] as string) || request.ip;
+        if (userIp === '::1') userIp = '127.0.0.1'; 
     await this.activitiesService.create({
       userId: userBDId,
-      action: 'Inicio de sesión.',
+      activityType: 'INICIO DE SESIÓN',
       detail: 'Inicio de sesión exitoso',
+      ip: userIp
     });
     return await this.findOne(userBDId);
   }
 
   //eliminar usuario
-  async deleteUser(id: string, updateUserDto: UpdateUserDto){
+  async deleteUser(id: string, updateUserDto: UpdateUserDto, request: Request){
     if(updateUserDto.userAdminId.length !== 0){
       const userBD = await this.findOne(id); // Retorna el usuario formateado
       await this.findOneByIdAdmin(updateUserDto.userAdminId);
@@ -242,10 +263,15 @@ export class UsersService {
         },
       });
       await this.dynamoService.dynamoCliente.send(updateCommand);
+      let userIp = Array.isArray(request.headers['x-forwarded-for']) 
+        ? request.headers['x-forwarded-for'][0]
+        : (request.headers['x-forwarded-for'] as string) || request.ip;
+            if (userIp === '::1') userIp = '127.0.0.1'; 
       await this.activitiesService.create({
         userId: updateUserDto.userAdminId,
-        action: 'User deletion',
-        detail: `Usuario con ID ${id} eliminado.`,
+        activityType: 'ELIMINACIÓN DE USUARIO',
+        detail: `Usuario con ID ${id} eliminado por el Administrador con id ${updateUserDto.userAdminId}.El usuario con ID ${id} ha sido eliminado por el Administrador con ID ${updateUserDto.userAdminId} en el sistema.`,
+        ip: userIp
       });
       return { message: 'Usuario eliminado correctamente.' };
     }else{

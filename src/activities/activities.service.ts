@@ -43,7 +43,7 @@ export class ActivitiesService {
       Key: {
         primaryKey: id,
       },
-    });    
+    });
     const result = await this.dynamodbService.dynamoCliente.send(command);
     if(!result.Item)
       throw new NotFoundException('Actividad no encontrada.')
@@ -54,9 +54,10 @@ export class ActivitiesService {
     return {
       primaryKey: item.primaryKey.S,
       userId: item.userId.S,
-      action: item.action.S,
+      activityType: item.activityType.S,
       createdAt: item.createdAt.N,
       detail: item.detail.S,
+      ip: item.ip.S
     };
   }
 

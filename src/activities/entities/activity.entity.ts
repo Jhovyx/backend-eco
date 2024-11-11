@@ -9,11 +9,14 @@ export class Activity {
   userId: string;
 
   @Field() 
-  action: string;
+  activityType: string;
 
   @Field(() => Int)
   createdAt: number;
 
   @Field() 
   detail: string;
+
+  @Field()
+  ip: string;
 }
