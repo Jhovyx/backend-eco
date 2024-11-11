@@ -47,10 +47,11 @@ export class UsersService {
     await this.dynamoService.dynamoCliente.send(command);
     await this.activitiesService.create({
       userId: newUser.primaryKey,
-      action: 'Creacion de usuario.',
+      activityType: 'Creacion de usuario.',
       detail: userAdminId 
         ? `Usuario administrador creado por ${userAdminId}.` 
         : `Usuario cliente creado.`,
+        ip: '192.0.0.1'
     });
     return { message: 'Usuario creado con éxito.' };
   }
@@ -135,8 +136,9 @@ export class UsersService {
     await this.dynamoService.dynamoCliente.send(updateCommand);
     await this.activitiesService.create({
       userId: id,
-      action: 'Actualizacion de usuario.',
+      activityType: 'Actualizacion de usuario.',
       detail: `Usuario actualizado correctamente.`,
+      ip: '127.0.0.1'
     });
     return userBD;
   }
@@ -183,8 +185,9 @@ export class UsersService {
     //Registrar la actividad de cambio de contraseña
     await this.activitiesService.create({
       userId: id,
-      action: 'Actualizacion de contraseña usuario.',
+      activityType: 'Actualizacion de contraseña usuario.',
       detail: `Contraseña actualizada correctamente.`,
+      ip: '127.0.0.1'
     });
     return { message: 'Contraseña actualizada correctamente.'};
   }
@@ -219,9 +222,11 @@ export class UsersService {
     }
     await this.activitiesService.create({
       userId: userBDId,
-      action: 'Inicio de sesión.',
+      activityType: 'Inicio de sesión.',
       detail: 'Inicio de sesión exitoso',
+      ip: '127.0.0.1'
     });
+
     return await this.findOne(userBDId);
   }
 
@@ -244,8 +249,9 @@ export class UsersService {
       await this.dynamoService.dynamoCliente.send(updateCommand);
       await this.activitiesService.create({
         userId: updateUserDto.userAdminId,
-        action: 'User deletion',
+        activityType: 'User deletion',
         detail: `Usuario con ID ${id} eliminado.`,
+        ip: '127.0.0.1'
       });
       return { message: 'Usuario eliminado correctamente.' };
     }else{

@@ -9,9 +9,12 @@ export class CreateActivityDto {
     
     @IsString()
     @MinLength(1)
-    readonly action: string;
+    readonly activityType: string;
     
     @IsString()
     @MinLength(1)
     readonly detail: string;
+
+    @IsString()
+    readonly ip: string;
 }

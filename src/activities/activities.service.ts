@@ -50,14 +50,17 @@ export class ActivitiesService {
     return result.Item
   }
 
+
   private formatActivity(item: any) {
     return {
-      primaryKey: item.primaryKey.S,
-      userId: item.userId.S,
-      action: item.action.S,
-      createdAt: item.createdAt.N,
-      detail: item.detail.S,
+      primaryKey: item.primaryKey?.S || null,
+      userId: item.userId?.S || null,
+      activityType: item.activityType?.S || null,
+      createdAt: item.createdAt?.N ? Number(item.createdAt.N) : null,
+      detail: item.detail?.S || null,
+      ip: item.ip?.S || null,
     };
-  }
+}
+
 
 }
