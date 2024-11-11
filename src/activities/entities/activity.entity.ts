@@ -14,6 +14,9 @@ export class Activity {
   @Field(() => Int)
   createdAt: number;
 
+  @Field()
+  ip:string;
+
   @Field() 
   detail: string;
 

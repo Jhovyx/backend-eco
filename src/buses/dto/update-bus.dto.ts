@@ -17,4 +17,5 @@ export class UpdateBusDto {
     @MinLength(1)
     readonly modelo: string;
 
+
 }

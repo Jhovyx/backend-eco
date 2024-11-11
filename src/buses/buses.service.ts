@@ -1,11 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { CreateBusDto } from './dto/create-bus.dto';
 import { UpdateBusDto } from './dto/update-bus.dto';
+import { Bus } from './entities/bus.entity';
+import { v4 as uuid } from 'uuid';
 
 @Injectable()
 export class BusesService {
   create(createBusDto: CreateBusDto) {
-    return 'This action adds a new bus';
+    
+    /*const newBus: Bus = {
+      primaryKey: uuid(),
+      ...CreateBusDto,
+      createdAt: new Date().getTime(),
+      updatedAt: null,
+      estado: true,
+    }*/
+
   }
 
   findAll() {
