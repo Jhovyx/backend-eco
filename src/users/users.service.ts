@@ -52,19 +52,11 @@ export class UsersService {
     if (userIp === '::1') userIp = '127.0.0.1'; 
     await this.activitiesService.create({
       userId: newUser.primaryKey,
-<<<<<<< HEAD
       activityType: 'CREACIÓN DE USUARIO',
       detail: userAdminId 
         ? `Usuario administrador creado por ${userAdminId}.` 
         : `Usuario cliente creado.`,
-      ip: userIp
-=======
-      activityType: 'CREACION DE USUARIO',
-      detail: userAdminId 
-        ? `Usuario administrador creado por ${userAdminId}.` 
-        : `Usuario cliente creado.`,
-        ip: '192.0.0.1'
->>>>>>> df1c3df7a7035aa27914e3667f3624807d011e48
+       ip: userIp
     });
     return { message: 'Usuario creado con éxito.' };
   }
@@ -155,11 +147,7 @@ export class UsersService {
       userId: id,
       activityType: 'ACTUALIZACIÓN DE USUARIO',
       detail: `Usuario actualizado correctamente.`,
-<<<<<<< HEAD
       ip: userIp
-=======
-      ip: '127.0.0.1'
->>>>>>> df1c3df7a7035aa27914e3667f3624807d011e48
     });
     return userBD;
   }
@@ -212,11 +200,7 @@ export class UsersService {
       userId: id,
       activityType: 'ACTUALIZACIÓN DE CONTRASEÑA',
       detail: `Contraseña actualizada correctamente.`,
-<<<<<<< HEAD
       ip: userIp
-=======
-      ip: '127.0.0.1'
->>>>>>> df1c3df7a7035aa27914e3667f3624807d011e48
     });
     return { message: 'Contraseña actualizada correctamente.'};
   }
@@ -257,11 +241,7 @@ export class UsersService {
       userId: userBDId,
       activityType: 'INICIO DE SESIÓN',
       detail: 'Inicio de sesión exitoso',
-<<<<<<< HEAD
       ip: userIp
-=======
-      ip: '127.0.0.1'
->>>>>>> df1c3df7a7035aa27914e3667f3624807d011e48
     });
 
     return await this.findOne(userBDId);
@@ -291,13 +271,8 @@ export class UsersService {
       await this.activitiesService.create({
         userId: updateUserDto.userAdminId,
         activityType: 'ELIMINACIÓN DE USUARIO',
-<<<<<<< HEAD
-        detail: `Usuario con ID ${id} eliminado por el Administrador con id ${updateUserDto.userAdminId}.El usuario con ID ${id} ha sido eliminado por el Administrador con ID ${updateUserDto.userAdminId} en el sistema.`,
+        detail: `Usuario con ID ${id} eliminado por el Administrador con id ${updateUserDto.userAdminId}.`,
         ip: userIp
-=======
-        detail: `Usuario con ID ${id} eliminado.`,
-        ip: '127.0.0.1'
->>>>>>> df1c3df7a7035aa27914e3667f3624807d011e48
       });
       return { message: 'Usuario eliminado correctamente.' };
     }else{
