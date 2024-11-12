@@ -1,15 +1,16 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Req, ParseUUIDPipe } from '@nestjs/common';
 import { BusesService } from './buses.service';
 import { CreateBusDto } from './dto/create-bus.dto';
 import { UpdateBusDto } from './dto/update-bus.dto';
+import { Request } from 'express';
 
 @Controller('buses')
 export class BusesController {
   constructor(private readonly busesService: BusesService) {}
 
   @Post()
-  create(@Body() createBusDto: CreateBusDto) {
-    return this.busesService.create(createBusDto);
+  create(@Body() createBusDto: CreateBusDto, @Req() request: Request) {
+    return this.busesService.create(createBusDto, request);
   }
 
   @Get()
@@ -18,17 +19,17 @@ export class BusesController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.busesService.findOne(+id);
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.busesService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateBusDto: UpdateBusDto) {
-    return this.busesService.update(+id, updateBusDto);
+  update(@Param('id', ParseUUIDPipe) id: string, @Body() updateBusDto: UpdateBusDto, @Req() request: Request) {
+    return this.busesService.update(id, updateBusDto, request);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.busesService.remove(+id);
+  @Patch('delete/:id')
+  remove(@Param('id', ParseUUIDPipe) id: string, @Body() updateBusDto: UpdateBusDto, @Req() request: Request) {
+    return this.busesService.remove(id,updateBusDto, request);
   }
 }

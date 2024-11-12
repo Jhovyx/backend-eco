@@ -19,7 +19,4 @@ export class Activity {
 
   @Field() 
   detail: string;
-
-  @Field()
-  ip: string;
 }

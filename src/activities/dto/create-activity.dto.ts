@@ -17,8 +17,4 @@ export class CreateActivityDto {
 
     @IsString()
     readonly ip: string;
-<<<<<<< HEAD
-
-=======
->>>>>>> df1c3df7a7035aa27914e3667f3624807d011e48
 }

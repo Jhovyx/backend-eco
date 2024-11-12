@@ -296,7 +296,7 @@ export class UsersService {
   }
 
   //buscar si es admin
-  private async findOneByIdAdmin(id: string) {
+  async findOneByIdAdmin(id: string) {
     const userBD = await this.findOne(id);
     if (userBD.userType !== "admin")
         throw new NotFoundException('Este usuario no está permitido que realize esta acción.');

@@ -53,23 +53,14 @@ export class ActivitiesService {
 
   private formatActivity(item: any) {
     return {
-<<<<<<< HEAD
       primaryKey: item.primaryKey.S,
       userId: item.userId.S,
       activityType: item.activityType.S,
       createdAt: item.createdAt.N,
       detail: item.detail.S,
       ip: item.ip.S
-=======
-      primaryKey: item.primaryKey?.S || null,
-      userId: item.userId?.S || null,
-      activityType: item.activityType?.S || null,
-      createdAt: item.createdAt?.N ? Number(item.createdAt.N) : null,
-      detail: item.detail?.S || null,
-      ip: item.ip?.S || null,
->>>>>>> df1c3df7a7035aa27914e3667f3624807d011e48
     };
-}
+  }
 
 
 }
