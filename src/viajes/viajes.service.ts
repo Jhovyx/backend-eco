@@ -11,6 +11,7 @@ import { v4 as uuid } from 'uuid';
 import { GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { Request } from 'express';
 import { ScanCommand } from '@aws-sdk/client-dynamodb';
+import { unmarshall } from '@aws-sdk/util-dynamodb';
 
 @Injectable()
 export class ViajesService {
@@ -74,7 +75,7 @@ export class ViajesService {
     });
     const { Items } = await this.dynamoService.dynamoCliente.send(command);
 
-    return Items;
+    return Items.map(item => unmarshall(item));
   }
 
   async findOne(id: string) {
