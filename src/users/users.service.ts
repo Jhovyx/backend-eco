@@ -23,11 +23,11 @@ export class UsersService {
 
   //CREAR
   async create(createUserDto: CreateUserDto, request: Request) {
-
+    
     // Verifica si el usuario ya existe por correo electrónico
     const userExist = await this.findOneByEmail(createUserDto.email)
-    if(userExist && userExist.length > 0)
-      throw new NotFoundException('El correo ingresado ya esta registrado.');
+    if(userExist !== "x")
+      throw new NotFoundException("Este usuario ya tiene una cuenta.");
 
     const {userAdminId,firstName,lastName,password, ...user} = createUserDto;
 
@@ -125,7 +125,7 @@ export class UsersService {
     if(updateUserDto.email && updateUserDto.email.length !== 0){
       // Verifica que el email no esté en uso por otro usuario
       const userId = await this.findOneByEmail(updateUserDto.email);
-      if(userId && userId !== id){
+      if(userId !== "x"){
         throw new NotFoundException('El correo electrónico ya está en uso por otro usuario.');
       }
       userBD.email = updateUserDto.email;
@@ -229,7 +229,7 @@ export class UsersService {
   //LOGUEAR
   async login(loginUserDTO: LoginDTO, request: Request) {
     const userBDId = await this.findOneByEmail(loginUserDTO.email);
-    if (!userBDId) 
+    if (userBDId === "x") 
       throw new NotFoundException('Usuario no encontrado.');
     // preparacion de la consulta
     const command = new GetCommand({
@@ -282,8 +282,7 @@ export class UsersService {
     const {Items} = await this.dynamoService.dynamoCliente.send(command);
 
     // Si no se encuentra el usuario, lanzamos una excepción
-    if (!Items || Items.length === 0)
-      throw new NotFoundException('Usuario no encontrado.');
+    if (!Items || Items.length === 0)return "x";
 
     // Retorna el ID del usuario si existe
     return Items[0].primaryKey.S;
