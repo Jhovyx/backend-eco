@@ -31,7 +31,7 @@ export class User {
     profilePictureUrl?: string;
 
     @Field()
-    userType: string;  // "cargo" in English
+    userType: string;
 
     @Field(() => Boolean)
     estado: Boolean;

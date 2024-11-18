@@ -40,9 +40,4 @@ export class UsersController {
     return this.usersService.login(loginUserDTO, request);
   }
 
-  @Patch('delete/:id')
-  deleteUser(@Param('id', ParseUUIDPipe) id: string, @Body() updateUserDto: UpdateUserDto, @Req() request: Request){
-    return this.usersService.deleteUser(id, updateUserDto, request);
-  }
-
 }

@@ -28,8 +28,4 @@ export class BusesController {
     return this.busesService.update(id, updateBusDto, request);
   }
 
-  @Patch('delete/:id')
-  remove(@Param('id', ParseUUIDPipe) id: string, @Body() updateBusDto: UpdateBusDto, @Req() request: Request) {
-    return this.busesService.remove(id,updateBusDto, request);
-  }
 }

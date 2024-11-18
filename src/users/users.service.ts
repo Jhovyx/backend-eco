@@ -2,15 +2,17 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { DynamodbService } from 'src/dynamodb/dynamodb.service';
-import { GetItemCommand, QueryCommand, ScanCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
+import { QueryCommand, UpdateItemCommand, ScanCommand } from '@aws-sdk/client-dynamodb';
 import { v4 as uuid } from 'uuid';
 import * as bcrypt from 'bcrypt';
 import { User } from './entities/user.entity';
-import { PutCommand, } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, PutCommand, } from '@aws-sdk/lib-dynamodb';
 import { UpdatePasswordDTO } from './dto/update-password.dto';
 import { LoginDTO } from './dto/login-users.dto';
 import { ActivitiesService } from 'src/activities/activities.service';
 import { Request } from 'express';
+import { unmarshall } from '@aws-sdk/util-dynamodb';
+
 @Injectable()
 export class UsersService {
   //create, findAll, findOne, update-user, update-password and login
@@ -19,15 +21,26 @@ export class UsersService {
     private readonly activitiesService: ActivitiesService
   ){}
 
-  //crear
+  //CREAR
   async create(createUserDto: CreateUserDto, request: Request) {
+
+    // Verifica si el usuario ya existe por correo electrónico
     const userExist = await this.findOneByEmail(createUserDto.email)
     if(userExist && userExist.length > 0)
       throw new NotFoundException('El correo ingresado ya esta registrado.');
+
     const {userAdminId,firstName,lastName,password, ...user} = createUserDto;
-    if(userAdminId) await this.findOneByIdAdmin(userAdminId);
+
+    // Verifica si hay un ID de usuario administrador y, si existe, valida que sea válido
+    if(createUserDto.userAdminId) await this.findOneByIdAdmin(createUserDto.userAdminId);
+
+    // Encripta la contraseña
     const passwordEncripted = await bcrypt.hash(password, 10);
+
+    // Define el tipo de usuario
     const userType = userAdminId ? 'admin' : 'cliente';
+
+    // Crea el nuevo usuario
     const newUser: User = {
       primaryKey: uuid(),
       createdAt: new Date().getTime(),
@@ -37,8 +50,10 @@ export class UsersService {
       password: passwordEncripted,
       estado: true,
       userType,
-      updatedAt: null
+      updatedAt: null,
     };
+
+    //preparacion de la consulta
     const command = new PutCommand({
       TableName: 'users',
       Item: {
@@ -46,87 +61,90 @@ export class UsersService {
       }
     })
     await this.dynamoService.dynamoCliente.send(command);
-    let userIp = Array.isArray(request.headers['x-forwarded-for']) 
-    ? request.headers['x-forwarded-for'][0]  // Si es un arreglo, toma la primera IP
-    : (request.headers['x-forwarded-for'] as string) || request.ip; // Si no, usa la IP del encabezado o la IP directa
-    if (userIp === '::1') userIp = '127.0.0.1'; 
+
+    // Obtiene la IP del usuario de forma segura
+    const userIp = this.extractUserIp(request);
+    
+    // Registra la actividad
     await this.activitiesService.create({
       userId: newUser.primaryKey,
       activityType: 'CREACIÓN DE USUARIO',
-      detail: userAdminId 
-        ? `Usuario administrador creado por ${userAdminId}.` 
+      detail: userAdminId
+        ? `Usuario administrador creado por ${userAdminId}.`
         : `Usuario cliente creado.`,
-       ip: userIp
+      ip: userIp,
     });
+
+    //retorna el mensaje
     return { message: 'Usuario creado con éxito.' };
   }
 
-  //obtener todos
+  //OBTENER TODOS
   async findAll() {
     const command = new ScanCommand({
       TableName: 'users',
-      FilterExpression: 'estado = :estadoValue',
-      ProjectionExpression: 'primaryKey, firstName, lastName, documentType, documentNumber, phoneNumber, email, profilePictureUrl, userType, createdAt, updatedAt',
-      ExpressionAttributeValues: {
-        ':estadoValue': { BOOL: true }
-      }
+      ProjectionExpression: 'primaryKey, firstName, lastName, documentType, documentNumber, phoneNumber, email, profilePictureUrl, userType, createdAt, updatedAt, estado',
     });
-    const result = await this.dynamoService.dynamoCliente.send(command);
-    return result.Items.map(item => this.formatUser(item));
+    const {Items} = await this.dynamoService.dynamoCliente.send(command);
+   
+    return Items.map(item => unmarshall(item));
   }
 
-  //obtener po id
+  //OBTENER POR ID
   async findOne(id: string) {
-    const command = new GetItemCommand({
+    const command = new GetCommand({
       TableName: 'users',
       Key: {
-        primaryKey: { S: id },  // Clave de partición
+        primaryKey:  id ,
       },
       ProjectionExpression: 'primaryKey, firstName, lastName, documentType, documentNumber, phoneNumber, email, profilePictureUrl, userType, createdAt, updatedAt, estado',
     });
-    
-    const result = await this.dynamoService.dynamoCliente.send(command);
-  
-    if (!result.Item)
+    const {Item} = await this.dynamoService.dynamoCliente.send(command);
+    if (!Item)
       throw new NotFoundException('Usuario no encontrado.');
-    // Comprobar si el estado es true
-    const userStatus = result.Item.estado?.BOOL;
-    if (userStatus !== true) 
-      throw new NotFoundException('Usuario no encontrado.');
-    return this.formatUser(result.Item);
+    return Item;
   }
 
-  //actulizar usuario
+  //ACTUALIZAR
   async update(id: string, updateUserDto: UpdateUserDto, request: Request) {
-    // Desestructurar los datos de updateUserDto
-      const {documentNumber,documentType,email,firstName,lastName,phoneNumber,profilePictureUrl} = updateUserDto;
-      if(!documentNumber && !documentType && !email && !firstName && !lastName && !phoneNumber && !profilePictureUrl)
-        throw new NotFoundException('No hay datos para actulizar.');
-     //Verificar que el usuario exista
-      const userBD = await this.findOne(id);
 
-      userBD.updatedAt = new Date().getTime();
-      if(email){
-        const userId = await this.findOneByEmail(email);
-        if(userId && userId !== id){
-          throw new NotFoundException('El correo electrónico ya está en uso por otro usuario.');
-        }
-        userBD.email = email;
+    //Verificar que el usuario exista
+    const userBD = await this.findOne(id);
+    if (updateUserDto.estado !== undefined) {
+      if(updateUserDto.userAdminId && updateUserDto.userAdminId.length !== 0){
+        await this.findOneByIdAdmin(updateUserDto.userAdminId);
+        userBD.estado = updateUserDto.estado;
+      }else{
+        throw new NotFoundException("Este usuario no esta permitido que realize esta acción.");
       }
-      // Actualizar los otros campos
-    if (documentType) userBD.documentType = documentType;
-    if (documentNumber) userBD.documentNumber = documentNumber;
-    if (firstName) userBD.firstName = firstName.toUpperCase();
-    if (lastName) userBD.lastName = lastName.toUpperCase();
-    if (phoneNumber) userBD.phoneNumber = phoneNumber;
-    if (profilePictureUrl) userBD.profilePictureUrl = profilePictureUrl;
+    } 
 
+    userBD.updatedAt = new Date().getTime();
+
+    // Solo se actualizan los campos que se pasan en el DTO
+    if(updateUserDto.email && updateUserDto.email.length !== 0){
+      // Verifica que el email no esté en uso por otro usuario
+      const userId = await this.findOneByEmail(updateUserDto.email);
+      if(userId && userId !== id){
+        throw new NotFoundException('El correo electrónico ya está en uso por otro usuario.');
+      }
+      userBD.email = updateUserDto.email;
+    }
+      // Actualizar los otros campos
+    if (updateUserDto.documentType && updateUserDto.documentType.length !== 0) userBD.documentType = updateUserDto.documentType;
+    if (updateUserDto.documentNumber && updateUserDto.documentNumber.length !== 0) userBD.documentNumber = updateUserDto.documentNumber;
+    if (updateUserDto.firstName && updateUserDto.firstName.length !== 0) userBD.firstName = updateUserDto.firstName.toUpperCase();
+    if (updateUserDto.lastName && updateUserDto.lastName.length !== 0) userBD.lastName = updateUserDto.lastName.toUpperCase();
+    if (updateUserDto.phoneNumber && updateUserDto.phoneNumber.length !== 0) userBD.phoneNumber = updateUserDto.phoneNumber;
+    if (updateUserDto.profilePictureUrl && updateUserDto.profilePictureUrl.length !== 0) userBD.profilePictureUrl = updateUserDto.profilePictureUrl;
+
+    //preparacion de la consulta
     const updateCommand = new UpdateItemCommand({
       TableName: 'users',
       Key: { 
         primaryKey: { S: userBD.primaryKey },
       },
-      UpdateExpression: 'set email = :email, documentType = :documentType, documentNumber = :documentNumber, updatedAt = :updatedAt, firstName = :firstName, lastName = :lastName, phoneNumber = :phoneNumber, profilePictureUrl = :profilePictureUrl',
+      UpdateExpression: 'set email = :email, documentType = :documentType, documentNumber = :documentNumber, updatedAt = :updatedAt, firstName = :firstName, lastName = :lastName, phoneNumber = :phoneNumber, profilePictureUrl = :profilePictureUrl, estado = :estado',
       ExpressionAttributeValues: {
         ':email': { S: userBD.email },
         ':documentType': { S: userBD.documentType },
@@ -136,13 +154,15 @@ export class UsersService {
         ':lastName': { S: userBD.lastName },
         ':phoneNumber': { S: userBD.phoneNumber },
         ':profilePictureUrl': { S: userBD.profilePictureUrl || ""  },
+        ':estado': { BOOL: userBD.estado }
       },
-    }); 
+    });
     await this.dynamoService.dynamoCliente.send(updateCommand);
-    let userIp = Array.isArray(request.headers['x-forwarded-for']) 
-    ? request.headers['x-forwarded-for'][0]
-    : (request.headers['x-forwarded-for'] as string) || request.ip;
-    if (userIp === '::1') userIp = '127.0.0.1'; 
+    
+    // Obtiene la IP del usuario de forma segura
+    const userIp = this.extractUserIp(request);
+    
+    // Registra la actividad
     await this.activitiesService.create({
       userId: id,
       activityType: 'ACTUALIZACIÓN DE USUARIO',
@@ -152,32 +172,33 @@ export class UsersService {
     return userBD;
   }
 
-  //actulizar contraseña
+  //ACTUALIZAR CONTRASEÑA 
   async updatePasswordUser(id: string, dto: UpdatePasswordDTO, request: Request) {
     // Verificamos que el usuario exista
     const userDB = await this.findOne(id);
-    // Consultamos solo la contraseña para evitar exponer datos innecesarios
-    const command = new QueryCommand({
-      TableName: 'users',
-      KeyConditionExpression: 'primaryKey = :primaryKeyValue',
-      FilterExpression: 'estado = :estadoValue', // Filtrar por estado activo
-      ExpressionAttributeValues: {
-        ':primaryKeyValue': { S: userDB.primaryKey },
-        ':estadoValue': { BOOL: true },  // Aseguramos que el usuario esté activo
-      },
-      ProjectionExpression: 'password',  // Solo obtenemos la contraseña
-    });
-    const result = await this.dynamoService.dynamoCliente.send(command);
 
-    if (!result.Items || result.Items.length === 0)
+    // preparacion de la consulta
+    const command = new GetCommand({
+      TableName: 'users',
+      Key: {
+        primaryKey: id ,
+      },
+      ProjectionExpression: 'password',
+    });
+    const {Item} = await this.dynamoService.dynamoCliente.send(command);
+
+    // Verificamos que el usuario existe y tiene contraseña
+    if (!Item || !Item.password)
       throw new NotFoundException('Usuario no encontrado.');
-    const userBD = result.Items[0]; // Obtener el primer (y único) item
-    const passwordMatch = await bcrypt.compare(dto.oldPassword, userBD.password.S);
+
+    const passwordMatch = await bcrypt.compare(dto.oldPassword, Item.password);
     if (!passwordMatch)
       throw new NotFoundException('Contraseña incorrecta.');
+
     //Hash de la nueva contraseña
     const hashedNewPassword = await bcrypt.hash(dto.newPassword, 15);
-    //Actualizamos la contraseña en la base de datos
+
+    //preparacion consulta de actualizacion
     const updateCommand = new UpdateItemCommand({
       TableName: 'users',
       Key: {
@@ -186,57 +207,57 @@ export class UsersService {
       UpdateExpression: 'SET password = :password, updatedAt = :updatedAt',
       ExpressionAttributeValues: {
         ':password': { S: hashedNewPassword },  // Actualizamos la contraseña
-        ':updatedAt': { N: new Date().getTime().toString() },  // Timestamp de actualización
+        ':updatedAt': { N: new Date().getTime().toString() },
       },
     });
     await this.dynamoService.dynamoCliente.send(updateCommand);
 
-    let userIp = Array.isArray(request.headers['x-forwarded-for']) 
-    ? request.headers['x-forwarded-for'][0]
-    : (request.headers['x-forwarded-for'] as string) || request.ip;
-    if (userIp === '::1') userIp = '127.0.0.1'; 
-    //Registrar la actividad de cambio de contraseña
+    // Obtiene la IP del usuario de forma segura
+    const userIp = this.extractUserIp(request);
+
+    // Registra la actividad
     await this.activitiesService.create({
       userId: id,
       activityType: 'ACTUALIZACIÓN DE CONTRASEÑA',
       detail: `Contraseña actualizada correctamente.`,
       ip: userIp
     });
+
     return { message: 'Contraseña actualizada correctamente.'};
   }
 
-  //loguear
+  //LOGUEAR
   async login(loginUserDTO: LoginDTO, request: Request) {
     const userBDId = await this.findOneByEmail(loginUserDTO.email);
     if (!userBDId) 
       throw new NotFoundException('Usuario no encontrado.');
-    const command = new QueryCommand({
+    // preparacion de la consulta
+    const command = new GetCommand({
       TableName: 'users',
-      KeyConditionExpression: 'primaryKey = :primaryKeyValue',
-      FilterExpression: 'estado = :estadoValue', // Filtrar por estado
-      ExpressionAttributeValues: {
-        ':primaryKeyValue': { S: userBDId },
-        ':estadoValue': { BOOL: true },
+      Key: {
+        primaryKey: userBDId,
       },
-      ProjectionExpression: 'password, estado',  // Solo obtenemos los campos necesarios
+      ProjectionExpression: 'password, estado',
     });
-    // 3. Ejecutamos el comando y esperamos el resultado
-    const result = await this.dynamoService.dynamoCliente.send(command);
-
-    // 4. Verificamos si encontramos el usuario y su estado es true
-    if (!result.Items || result.Items.length === 0 || result.Items[0].estado.BOOL === false) {
+    const {Item} = await this.dynamoService.dynamoCliente.send(command);
+    
+    // Verificamos que el usuario existe y tiene contraseña
+    if (!Item || !Item.password)
       throw new NotFoundException('Usuario no encontrado.');
-    }
 
-    // 5. Comparamos la contraseña
-    const passwordMatch = await bcrypt.compare(loginUserDTO.password, result.Items[0].password.S);
-    if (!passwordMatch) {
+    //verificamos el estado 
+    if (Item.estado === false)
+      throw new NotFoundException('Usuario no encontrado.');
+
+    // Comparamos la contraseña
+    const passwordMatch = await bcrypt.compare(loginUserDTO.password, Item.password);
+    if (!passwordMatch) 
       throw new NotFoundException('Contraseña incorrecta.');
-    }
-    let userIp = Array.isArray(request.headers['x-forwarded-for']) 
-    ? request.headers['x-forwarded-for'][0]
-    : (request.headers['x-forwarded-for'] as string) || request.ip;
-        if (userIp === '::1') userIp = '127.0.0.1'; 
+    
+    // Obtiene la IP del usuario de forma segura
+    const userIp = this.extractUserIp(request);
+    
+    // Registra la actividad
     await this.activitiesService.create({
       userId: userBDId,
       activityType: 'INICIO DE SESIÓN',
@@ -244,80 +265,47 @@ export class UsersService {
       ip: userIp
     });
 
+    //devolver el usuario logueado
     return await this.findOne(userBDId);
   }
-
-  //eliminar usuario
-  async deleteUser(id: string, updateUserDto: UpdateUserDto, request: Request){
-    if(updateUserDto.userAdminId.length !== 0){
-      const userBD = await this.findOne(id); // Retorna el usuario formateado
-      await this.findOneByIdAdmin(updateUserDto.userAdminId);
-      const updateCommand = new UpdateItemCommand({
-        TableName: 'users',
-        Key: {
-          primaryKey: { S: id },
-        },
-        UpdateExpression: 'SET estado = :estado, updatedAt = :updatedAt',
-        ExpressionAttributeValues: {
-          ':estado': { BOOL: false },  // Marcar como eliminado
-          ':updatedAt': { N: new Date().getTime().toString() },  // Marca el tiempo de la actualización
-        },
-      });
-      await this.dynamoService.dynamoCliente.send(updateCommand);
-      let userIp = Array.isArray(request.headers['x-forwarded-for']) 
-        ? request.headers['x-forwarded-for'][0]
-        : (request.headers['x-forwarded-for'] as string) || request.ip;
-            if (userIp === '::1') userIp = '127.0.0.1'; 
-      await this.activitiesService.create({
-        userId: updateUserDto.userAdminId,
-        activityType: 'ELIMINACIÓN DE USUARIO',
-        detail: `Usuario con ID ${id} eliminado por el Administrador con id ${updateUserDto.userAdminId}.`,
-        ip: userIp
-      });
-      return { message: 'Usuario eliminado correctamente.' };
-    }else{
-      throw new NotFoundException('Este usuario no puede realizar esta acción.')
-    }
-  }
   
-  //buscar por email y retorna el id del email
+  // Buscar por email y retorna el ID del email
   private async findOneByEmail(email: string) {
     const command = new QueryCommand({
       TableName: 'users',
-      IndexName: 'email-index',
+      IndexName: 'email-index',//GSI
       KeyConditionExpression: 'email = :email',
       ExpressionAttributeValues: {
         ':email': { S: email },
       },
     });
-    const result = await this.dynamoService.dynamoCliente.send(command);
-    if(result.Items && result.Items.length > 0) return result.Items[0].primaryKey.S;
-    return;
+    const {Items} = await this.dynamoService.dynamoCliente.send(command);
+
+    // Si no se encuentra el usuario, lanzamos una excepción
+    if (!Items || Items.length === 0)
+      throw new NotFoundException('Usuario no encontrado.');
+
+    // Retorna el ID del usuario si existe
+    return Items[0].primaryKey.S;
   }
 
-  //buscar si es admin
+  // Buscar si el usuario es admin
   async findOneByIdAdmin(id: string) {
     const userBD = await this.findOne(id);
+    // Verifica si el tipo de usuario es 'admin'
     if (userBD.userType !== "admin")
         throw new NotFoundException('Este usuario no está permitido que realize esta acción.');
-    return;
+    // Verifica si el estado del usuario tiene el estado en falso
+    if (userBD.estado === false)
+      throw new NotFoundException('Este usuario no está permitido que realize esta acción.');
   }
 
-  //formatear a un json legible
-  private formatUser(item: any) {
-      return {
-          primaryKey: item.primaryKey.S,
-          firstName: item.firstName.S,
-          lastName: item.lastName.S,
-          documentType: item.documentType.S,
-          documentNumber: item.documentNumber.S,
-          phoneNumber: item.phoneNumber.S,
-          email: item.email.S,
-          profilePictureUrl: item.profilePictureUrl?.S || null,
-          userType: item.userType.S,
-          createdAt: item.createdAt.N,
-          updatedAt: item.updatedAt?.N || null
-      };
+  // Función para extraer la IP del usuario
+  private extractUserIp(request: Request): string {
+    let userIp = Array.isArray(request.headers['x-forwarded-for'])
+      ? request.headers['x-forwarded-for'][0]
+      : (request.headers['x-forwarded-for'] as string) || request.ip;
+    return userIp === '::1' ? '127.0.0.1' : userIp;
   }
-
+  
 }

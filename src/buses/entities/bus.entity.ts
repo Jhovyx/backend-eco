@@ -15,6 +15,9 @@ export class Bus {
   @Field(() => Int)
   capacidad: number;
 
+  @Field()
+  userAdminId: string;
+
   @Field(() => Boolean)
   estado: Boolean;
 

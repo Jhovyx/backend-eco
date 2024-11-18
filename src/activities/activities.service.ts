@@ -5,6 +5,7 @@ import { v4 as uuid } from 'uuid';
 import { GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { DynamodbService } from 'src/dynamodb/dynamodb.service';
 import { ScanCommand } from '@aws-sdk/client-dynamodb';
+import { unmarshall } from '@aws-sdk/util-dynamodb';
 
 @Injectable()
 export class ActivitiesService {
@@ -13,12 +14,17 @@ export class ActivitiesService {
     private readonly dynamodbService: DynamodbService
   ){}
 
+  //CREAR
   async create(createActivityDto: CreateActivityDto) {
+
+    //crear la nueva actividad
     const newActicity: Activity = {
       primaryKey: uuid(),
       createdAt: new Date().getTime(),
       ...createActivityDto
     };
+
+    //preparacion de la consulta
     const command = new PutCommand({
       TableName: 'activities',
       Item: {
@@ -29,14 +35,17 @@ export class ActivitiesService {
     return 'Actividad creada exitosamente.';
   }
 
+  //OBTENER TODAS 
   async findAll() {
     const command = new ScanCommand({
       TableName: 'activities',
     });
-    const result = await this.dynamodbService.dynamoCliente.send(command);
-    return result.Items.map(item => this.formatActivity(item));
+    const {Items} = await this.dynamodbService.dynamoCliente.send(command);
+
+    return Items.map(item => unmarshall(item));
   }
 
+  //OBTENER PO ID
   async findOne(id: string) {
     const command = new GetCommand({
       TableName: 'activities',
@@ -44,23 +53,9 @@ export class ActivitiesService {
         primaryKey: id,
       },
     });
-    const result = await this.dynamodbService.dynamoCliente.send(command);
-    if(!result.Item)
+    const {Item} = await this.dynamodbService.dynamoCliente.send(command);
+    if(!Item)
       throw new NotFoundException('Actividad no encontrada.')
-    return result.Item
+    return Item
   }
-
-
-  private formatActivity(item: any) {
-    return {
-      primaryKey: item.primaryKey.S,
-      userId: item.userId.S,
-      activityType: item.activityType.S,
-      createdAt: item.createdAt.N,
-      detail: item.detail.S,
-      ip: item.ip.S
-    };
-  }
-
-
 }

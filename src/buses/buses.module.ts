@@ -9,5 +9,6 @@ import { UsersModule } from 'src/users/users.module';
   controllers: [BusesController],
   providers: [BusesService],
   imports: [DynamodbModule,ActivitiesModule,UsersModule],
+  exports: [BusesService]
 })
 export class BusesModule {}

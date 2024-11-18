@@ -1,4 +1,4 @@
-import { IsEmail, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength, IsUUID, Validate } from "class-validator";
+import { IsEmail, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength, IsUUID, Validate, IsBoolean } from "class-validator";
 import { IsValidDocumentNumberConstraint } from "../validations/validation-document";
 
 export class UpdateUserDto {
@@ -52,4 +52,8 @@ export class UpdateUserDto {
     @MinLength(1)
     @IsUUID()
     readonly userAdminId?: string;
+
+    @IsOptional()
+    @IsBoolean()
+    readonly estado?: boolean
 }
